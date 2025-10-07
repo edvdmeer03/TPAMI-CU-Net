@@ -15,13 +15,12 @@ from CUNet import CUNet
 from torch.utils.data import DataLoader
 import cv2
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 class Trainer:
     def __init__(self):
-        self.epoch = 1000
-        self.batch_size = 64
+        self.epoch = 10
+        self.batch_size = 4
         self.lr = 0.0001
 
         print("===> Loading datasets")
@@ -30,7 +29,7 @@ class Trainer:
 
         print("===> Building model")
         self.model = CUNet()
-        self.model = self.model.cuda()
+        self.model = self.model.to(device)
         self.criterion = nn.MSELoss(reduction='mean')
 
         print("===> Setting Optimizer")
@@ -56,17 +55,14 @@ class Trainer:
             print(self.lr)
             epoch_loss = []
             for batch, (lr, hr, rgb) in enumerate(self.train_loader):
-                hr = hr.float()
-                lr = lr.float()
-                rgb = rgb.float()
-
-                hr = hr.cuda()
-                lr = lr.cuda()
-                rgb = rgb.cuda()
+                hr = hr.float().to(device)
+                lr = lr.float().to(device)
+                rgb = rgb.float().to(device)
 
                 self.optimizer.zero_grad()
 
-                torch.cuda.synchronize()
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
                 start_time = time.time()
 
                 # print(lr.shape)#64,1,64,64
@@ -79,10 +75,11 @@ class Trainer:
                 loss.backward()
                 self.optimizer.step()
 
-                torch.cuda.synchronize()
+                if torch.cuda.is_available():
+                    torch.cuda.synchronize()
                 end_time = time.time()
 
-                if batch % 200 == 0:
+                if batch % 10 == 0:
                     print('Epoch:{}\tcur/all:{}/{}\tAvg Loss:{:.4f}\tTime:{:.2f}'.format(ep, batch,len(self.train_loader),loss.item(),end_time - start_time))
 
             self.scheduler.step()
@@ -105,3 +102,6 @@ class Trainer:
 
             plt.close('all')
         print('===> Finished Training!')
+
+if __name__ == '__main__':
+    Trainer().train()
